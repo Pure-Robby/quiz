@@ -1,0 +1,22 @@
+{
+  "name": "cryptic-movie-quiz",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/excel-to-json.mjs && vite build",
+    "preview": "vite preview",
+    "quiz:build": "node scripts/excel-to-json.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.10",
+    "xlsx": "^0.18.5"
+  }
+}
