@@ -2,8 +2,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const authRedirectUrl = import.meta.env.VITE_AUTH_REDIRECT_URL
 
 export const ALLOWED_EMAIL_DOMAIN = 'puresurvey.co.za'
+export const LEADERBOARD_OWNER_EMAIL = 'robby@puresurvey.co.za'
 
 export const supabase = url && anonKey
   ? createClient(url, anonKey)
@@ -14,11 +16,17 @@ export function isAllowedEmail(email) {
   return email.toLowerCase().trim().endsWith('@' + ALLOWED_EMAIL_DOMAIN)
 }
 
+export function isLeaderboardOwner(email) {
+  return String(email || '').toLowerCase().trim() === LEADERBOARD_OWNER_EMAIL
+}
+
 export async function signInWithGoogle() {
   if (!supabase) return { error: new Error('Supabase not configured') }
+  const defaultRedirect = window.location.origin + '/'
+  const redirectTo = import.meta.env.DEV ? defaultRedirect : (authRedirectUrl || defaultRedirect)
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin + window.location.pathname },
+    options: { redirectTo },
   })
   if (error) return { error }
   if (data?.url) window.location.href = data.url
@@ -75,6 +83,17 @@ export async function getLeaderboard(limit = 50) {
   if (error) return { data: [], error }
   const withRank = (data || []).map((row, i) => ({ ...row, rank: i + 1 }))
   return { data: withRank, error: null }
+}
+
+export async function clearAllResults() {
+  if (!supabase) return { error: new Error('Supabase not configured') }
+  const user = await getCurrentUser()
+  if (!isLeaderboardOwner(user?.email)) {
+    return { error: new Error('Not authorized to clear all results') }
+  }
+  const { data, error } = await supabase.rpc('clear_all_quiz_results')
+  if (error) return { error }
+  return { error: null, deletedCount: Number(data || 0) }
 }
 
 export function findRankInLeaderboard(leaderboard, { score, displayName, created_at }) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getCurrentUser, signInWithGoogle, signOut, isAllowedEmail, getDisplayNameFromUser } from './supabase'
 
-export default function Landing({ onStart }) {
+export default function Landing({ onStart, onViewLeaderboard, onLogout }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [domainError, setDomainError] = useState(false)
@@ -76,8 +76,18 @@ export default function Landing({ onStart }) {
         <button type="button" onClick={handleStart} style={styles.button}>
           Start quiz
         </button>
-        <button type="button" onClick={() => signOut().then(() => setUser(null))} style={styles.buttonSecondary}>
-          Sign out
+        <button type="button" onClick={onViewLeaderboard} style={styles.buttonSecondary}>
+          View leaderboard
+        </button>
+        <button
+          type="button"
+          onClick={() => signOut().then(() => {
+            setUser(null)
+            onLogout()
+          })}
+          style={styles.buttonSecondary}
+        >
+          Log out
         </button>
       </div>
     </main>

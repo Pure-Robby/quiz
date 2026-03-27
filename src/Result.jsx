@@ -3,7 +3,7 @@ import { getCurrentUser, submitAttempt, getLeaderboard, findRankInLeaderboard } 
 
 const LEADERBOARD_LIMIT = 50
 
-export default function Result({ displayName, score, total, gaveUp, onPlayAgain }) {
+export default function Result({ displayName, score, total, gaveUp, attemptId, onPlayAgain }) {
   const [leaderboard, setLeaderboard] = useState([])
   const [rank, setRank] = useState(null)
   const [submitted, setSubmitted] = useState(false)
@@ -11,7 +11,16 @@ export default function Result({ displayName, score, total, gaveUp, onPlayAgain 
 
   useEffect(() => {
     let cancelled = false
+    const saveKey = `attempt-saved:${attemptId}`
+    const inFlightKey = `attempt-saving:${attemptId}`
     async function run() {
+      // Prevent duplicate inserts on React StrictMode remount in development.
+      if (attemptId && (sessionStorage.getItem(saveKey) === '1' || sessionStorage.getItem(inFlightKey) === '1')) {
+        const { data } = await getLeaderboard(LEADERBOARD_LIMIT)
+        if (!cancelled) setLeaderboard(data || [])
+        return
+      }
+      if (attemptId) sessionStorage.setItem(inFlightKey, '1')
       const user = await getCurrentUser()
       const userId = user?.id ?? null
       const answersJson = null
@@ -25,10 +34,15 @@ export default function Result({ displayName, score, total, gaveUp, onPlayAgain 
       })
       if (cancelled) return
       if (res.error) {
+        if (attemptId) sessionStorage.removeItem(inFlightKey)
         setError(res.error.message || 'Failed to save score')
         const { data } = await getLeaderboard(LEADERBOARD_LIMIT)
         setLeaderboard(data || [])
         return
+      }
+      if (attemptId) {
+        sessionStorage.setItem(saveKey, '1')
+        sessionStorage.removeItem(inFlightKey)
       }
       setSubmitted(true)
       const { data: list } = await getLeaderboard(LEADERBOARD_LIMIT)
@@ -45,7 +59,7 @@ export default function Result({ displayName, score, total, gaveUp, onPlayAgain 
     }
     run()
     return () => { cancelled = true }
-  }, [displayName, score, total, gaveUp])
+  }, [displayName, score, total, gaveUp, attemptId])
 
   return (
     <main className="result" style={styles.main}>

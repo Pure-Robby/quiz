@@ -1,19 +1,40 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { signOut } from './supabase'
 
 const normalize = (s) => String(s ?? '').toLowerCase().trim().replace(/\s+/g, ' ')
+const normalizeLoose = (s) =>
+  normalize(s)
+    .replace(/&/g, ' and ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+
+function buildVariants(input) {
+  const base = normalizeLoose(input)
+  if (!base) return []
+  const variants = new Set([base])
+  if (base.startsWith('the')) variants.add(base.slice(3))
+  if (base.startsWith('a')) variants.add(base.slice(1))
+  if (base.startsWith('an')) variants.add(base.slice(2))
+  variants.delete('')
+  return [...variants]
+}
 
 function checkAnswer(userAnswer, correctAnswer) {
   const a = normalize(userAnswer)
   const b = normalize(correctAnswer)
   if (a === b) return true
-  return a === normalize(b.replace(/[:\-–—]/g, ' '))
+  const userVariants = buildVariants(userAnswer)
+  const answerVariants = new Set(buildVariants(correctAnswer))
+  return userVariants.some((variant) => answerVariants.has(variant))
 }
 
-export default function Quiz({ displayName, onFinish }) {
+export default function Quiz({ displayName, onFinish, onViewLeaderboard, onLogout }) {
   const [questions, setQuestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const finishingRef = useRef(false)
 
   useEffect(() => {
     fetch('/quiz.json')
@@ -27,6 +48,8 @@ export default function Quiz({ displayName, onFinish }) {
   const setAnswer = (id, value) => setAnswers((prev) => ({ ...prev, [id]: value }))
 
   const handleSave = () => {
+    if (finishingRef.current) return
+    finishingRef.current = true
     setSubmitted(true)
     let score = 0
     const results = questions.map((q) => {
@@ -38,6 +61,8 @@ export default function Quiz({ displayName, onFinish }) {
   }
 
   const handleGiveUp = () => {
+    if (finishingRef.current) return
+    finishingRef.current = true
     setSubmitted(true)
     let score = 0
     const results = questions.map((q) => {
@@ -69,13 +94,25 @@ export default function Quiz({ displayName, onFinish }) {
       <header style={styles.header}>
         <h1 style={styles.h1}>Cryptic Movie Quiz</h1>
         <p style={styles.sub}>Hi, {displayName}. {total} questions.</p>
+        <div style={styles.headerActions}>
+          <button type="button" onClick={onViewLeaderboard} style={styles.linkButton}>
+            View leaderboard
+          </button>
+          <button
+            type="button"
+            onClick={() => signOut().then(onLogout)}
+            style={styles.linkButton}
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
       <ol style={styles.list}>
-        {questions.map((q) => (
+        {questions.map((q, index) => (
           <li key={q.id} style={styles.item}>
             <label htmlFor={`q-${q.id}`} style={styles.clue}>
-              {q.clue}
+              Question {index + 1}: {q.clue}
             </label>
             <input
               id={`q-${q.id}`}
@@ -112,6 +149,8 @@ const styles = {
   clue: { display: 'block', fontWeight: 500, marginBottom: 6 },
   input: { width: '100%', padding: '10px 12px', border: '1px solid #ccc', borderRadius: 6 },
   actions: { display: 'flex', gap: 12, marginTop: 24 },
+  headerActions: { display: 'flex', gap: 8, marginTop: 10 },
+  linkButton: { background: 'transparent', color: '#1a1a1a', border: '1px solid #ccc', borderRadius: 6, padding: '8px 12px' },
   button: { padding: '12px 24px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600 },
   buttonSecondary: { padding: '12px 24px', background: 'transparent', color: '#666', border: '1px solid #ccc', borderRadius: 6 },
 }
